@@ -168,4 +168,5 @@ Conclusion
 This guide provides an overview of how the frontend interacts with the backend and SignalR hubs. By understanding the purpose and structure of each component, frontend developers can extend or modify the UI as needed, ensuring proper communication with the backend.
 
 Feel free to reach out if you need further clarification on any part of the system.
-  
+Please find the video for how to things goes on UI side;
+https://lifeboxtransfer.com/s/0b3e705a-ff98-4d43-b81c-802c4271e219
