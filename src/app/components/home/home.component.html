@@ -1,0 +1,83 @@
+<div class="container">
+  <div>
+    <h1 class="alert alert-dark text-center mt-2">ToEDUR CHAT APP</h1>
+    <h2>{{user.nameSurname}} is Online</h2>
+    <button class="btn btn-danger" (click)="logout()" style="float: right;">Exit</button>
+  </div>
+
+  <div class="row clearfix">
+    <div class="col-lg-12 mt-2">
+      <div class="card chat-app">
+
+        <div class="search-section">
+          <input [(ngModel)]="searchTerm" (input)="searchUsers()" type="text" class="form-control"
+                 placeholder="Search user for start chat...">
+          <ul class="list-unstyled">
+            <li *ngFor="let user of usersForSelection" (click)="startNewChat(user)">
+              <div class="name">{{ user.nameSurname }}</div>
+            </li>
+          </ul>
+        </div>
+        <div id="plist" class="people-list">
+          <ul class="list-unstyled chat-list mt-2 mb-0">
+            <li class="clearfix" *ngFor="let chat of chats" (click)="selectChat(chat.chatId)">
+              <div class="about">
+                <div class="name">{{ chat.senderName }}</div>
+                <div class="name">{{ chat.lastMessage }}</div>
+                <div class="name">{{ chat.lastMessageDate | date: 'short' }}</div>
+                <div *ngIf="chat.isSeenCount && chat.isSeenCount > 0">{{ chat.isSeenCount }}</div>
+                <div *ngIf="chat.isShowIsSeen">{{ chat.isSeen ? "Seen" : "Not Seen" }}</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+
+
+        <div *ngIf="selectedChatId !== undefined">
+          <div class="chat">
+            <div class="chat-header clearfix">
+              <div class="row">
+                <div class="col-lg-6">
+                  <div class="chat-about">
+                    <h6 class="m-b-0">{{ selectedUserForSelection.nameSurname }}</h6>
+                    <h6 class="m-b-0">{{ selectedUserForSelection.isOnline ? "Online" : ("Offline, last seen: " + (selectedUserForSelection.lastActive | date:'short')) }}</h6>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-history">
+              <ul>
+                <li *ngFor="let message of messages">
+                  <div [ngClass]="{'message-left': message.senderId === Number(selectedUserForSelection.id), 'message-right': message.senderId === Number(user.id)}">
+                    <div class="message-content">
+                      <span class="message-sender">{{ message.senderId === Number(selectedUserForSelection.id) ? selectedUserForSelection.nameSurname : (message.senderId === Number(user.id) ? user.nameSurname : '') }}</span>
+                      <span class="message-text">{{ message.content }}</span>
+                      <span class="message-time">{{ message.sentDate | date: 'short' }}</span>
+                      <span *ngIf="message.receiverId !== Number(user.id)" class="message-status">{{ message.isSeen ? "Seen" : "Not Seen" }}</span>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+
+            <div class="chat-message clearfix">
+              <div class="input-group mb-0">
+                <input [(ngModel)]="message" type="text" class="form-control" placeholder="Enter text here..."
+                       (keydown.enter)="sendMessage()" style="height: 30px;">
+                <div>
+                  <button class="input-group-text" (click)="sendMessage()">Send Message</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedChatId === undefined" class="no-chat-selected">
+          <p class="text-center">Please select a chat to start messaging.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
