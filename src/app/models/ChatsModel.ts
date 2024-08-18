@@ -6,6 +6,8 @@ export interface ChatsModel
     lastMessageDate: string;
     isSeen: boolean;
     senderName: string;
+    senderId: number;
     isSeenCount?: number;
     isShowIsSeen: boolean;
+    isTyping?: boolean;
 }

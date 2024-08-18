@@ -17,7 +17,6 @@ import { Response } from "../../models/Response";
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, OnDestroy {
-  users: UserModel[] = [];
   usersForSelection: UserModel[] = [];
   chats: ChatsModel[] = [];
   messages: ChatModel[] = [];
@@ -29,6 +28,9 @@ export class HomeComponent implements OnInit, OnDestroy {
   hub: signalR.HubConnection | undefined;
   message: string = "";
   searchTerm: string = "";
+  typingStatus: Map<number, boolean> = new Map<number, boolean>();
+  isTyping: boolean = false;
+  typingTimeout: any;
 
 
   constructor(private http: HttpClient, private router: Router) {
@@ -46,7 +48,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
         const user = JSON.parse(decodedPayload);
         const userId = user['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
-        this.http.get<Response<UserModel>>("https://localhost:7187/api/User/GetUserById/" + userId)
+        this.http.get<Response<UserModel>>("https://localhost:7187/api/v1/user/GetUserById/" + userId)
           .subscribe(res => {
             console.log(res);
             this.user = res.data;
@@ -66,14 +68,13 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/messageHub").build();
 
+    console.log(this.hub);
     this.hub.start().then(() => {
       this.getChatsBelongToUser();
 
+
       this.hub?.invoke("Connect", parseInt(this.user.id.toString()));
 
-      this.hub?.on("ReceiveUsers", (res: UserModel[]) => {
-        this.users = res;
-      });
 
       this.hub?.on("UserLastInfo", (res: UserModel) => {
         if (this.selectedUser && this.selectedUser === res.id) {
@@ -100,6 +101,8 @@ export class HomeComponent implements OnInit, OnDestroy {
               c.isSeen = true;
             }
           });
+
+
         }
       });
 
@@ -108,10 +111,51 @@ export class HomeComponent implements OnInit, OnDestroy {
           return new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime();
         });
       });
+
+      this.hub?.on("ReceiveTyping", (senderId : number, isTyping: boolean) => {
+          this.typingStatus.set(senderId, isTyping);
+
+          this.chats.forEach(c => {
+            if (c.senderId === senderId) {
+              c.isTyping = isTyping;
+            }
+          });
+      });
+
+
     });
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+
+  }
+
+  onTyping() {
+    // Check if the input field is empty
+    if (!this.message || this.message.trim() === '') {
+      this.onStopTyping();  // Stop typing if the field is empty
+      return;
+    }
+
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+    }
+
+    this.hub?.invoke("IsConnectedUserTyping", this.user.id, this.selectedUserForSelection.id);
+
+    // Set a timeout to automatically stop typing after 3 seconds of inactivity
+    this.typingTimeout = setTimeout(() => {
+      console.log('Stopped typing');
+      this.onStopTyping();
+    }, 3000);
+  }
+
+  onStopTyping() {
+    console.log('Stopped typing');
+    clearTimeout(this.typingTimeout);
+    this.typingStatus.set(this.user.id, false);
+    this.hub?.invoke("IsConnectedUserNotTyping", this.user.id, this.selectedUserForSelection.id);
+  }
 
   ngOnDestroy() {
     if (this.hub && this.user.id) {
@@ -120,11 +164,13 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getChatsBelongToUser() {
-    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/api/Message/GetChatsByUserId/" + this.user.id)
+    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/api/v1/message/GetChatsByUserId/" + this.user.id)
       .subscribe(res => {
+
         this.chats = res.data.sort((a, b) => {
           return new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime();
         });
+        this.selectChat(res.data[0].chatId);
       }, err => {
         console.error(err);
       });
@@ -132,7 +178,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   searchUsers() {
     this.http.get<Response<UserModel[]>>(
-      `https://localhost:7187/api/Message/GetUserBySearchTerm/${this.searchTerm}`
+      `https://localhost:7187/api/v1/message/GetUserBySearchTerm/${this.searchTerm}`
     ).subscribe(res => {
       this.usersForSelection = res.data;
     }, err => {
@@ -175,6 +221,8 @@ export class HomeComponent implements OnInit, OnDestroy {
     console.log(chatId);
     this.selectedChatId = chatId;
 
+
+
     if (this.selectedChatId === 0) {
       // Start new chat
       this.selectedChat = new ChatModel();
@@ -189,7 +237,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.hub?.invoke("UserConnectChat", this.selectedChatId, this.user.id);
 
       this.http.get<Response<UserModel>>(
-        `https://localhost:7187/api/Message/IsUserOnline/${this.selectedUser}`
+        `https://localhost:7187/api/v1/message/IsUserOnline/${this.selectedUser}`
       ).subscribe(res => {
         console.log(res);
         this.selectedUserForSelection = res.data;
@@ -206,7 +254,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
       this.hub?.invoke("UserConnectChat", chatId, this.user.id);
 
-      this.http.get<Response<ChatModel[]>>("https://localhost:7187/api/Message/GetMessagesByChatId/" + chatId)
+
+
+      this.http.get<Response<ChatModel[]>>("https://localhost:7187/api/v1/message/GetMessagesByChatId/" + chatId)
         .subscribe(res => {
           this.messages = res.data;
 
@@ -218,18 +268,19 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
           this.http.get<Response<UserModel>>(
-            `https://localhost:7187/api/Message/IsUserOnline/${this.selectedUser}`
+            `https://localhost:7187/api/v1/message/IsUserOnline/${this.selectedUser}`
           ).subscribe(res => {
             this.selectedUserForSelection = res.data;
             console.log(this.selectedUserForSelection)
             console.log(this.user);
+
 
           }, err => {
             console.error(err);
           });
 
           this.http.get<Response<UserModel>>(
-            `https://localhost:7187/api/Message/UpdateLastMessageSeenStatusByChatId/${this.selectedChatId}?receiverId=${this.user.id}`
+            `https://localhost:7187/api/v1/message/UpdateLastMessageSeenStatusByChatId/${this.selectedChatId}?receiverId=${this.user.id}`
           ).subscribe(
             res => {
               this.messages.forEach(m => {
@@ -246,6 +297,9 @@ export class HomeComponent implements OnInit, OnDestroy {
           console.error(err);
         });
 
+
+
+
       this.hub?.invoke("UpdateCurrentMessageSeen", chatId, this.user.id);
     }
   }
@@ -261,20 +315,24 @@ export class HomeComponent implements OnInit, OnDestroy {
         isSeen: false
       };
 
-      this.http.post<ChatModel>("https://localhost:7187/api/Message/SendMessage", newMessage)
+      this.http.post<Response<ChatModel>>("https://localhost:7187/api/v1/message/SendMessage", newMessage)
         .subscribe(
           res => {
-            res.sentDate = new Date().toLocaleString();
-            this.messages.push(res);
+            this.messages.push(res.data);
             this.message = ""; // Mesaj giriş alanını temizle
             this.hub?.invoke("NotifyChatUpdates", this.user.id, this.selectedUser);
-            this.selectedChatId = res.chatId;
+            this.selectedChatId = res.data.chatId;
           },
           err => {
             console.error(err);
           }
         );
+
+      this.hub?.invoke("IsConnectedUserNotTyping", this.user.id, this.selectedUser);
+
     }
+
+
   }
 
   logout() {
