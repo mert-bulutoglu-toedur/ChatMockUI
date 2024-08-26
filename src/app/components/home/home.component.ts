@@ -1,13 +1,15 @@
-import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ChatModel } from '../../models/ChatModel';
-import { HttpClient } from '@angular/common/http';
+import {CommonModule} from '@angular/common';
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {ChatModel} from '../../models/ChatModel';
+import {HttpClient} from '@angular/common/http';
 import * as signalR from '@microsoft/signalr';
-import { FormsModule } from '@angular/forms';
-import { UserModel } from "../../models/UserModel";
-import { ChatsModel } from "../../models/ChatsModel";
-import { Router } from "@angular/router";
-import { Response } from "../../models/Response";
+import {FormsModule} from '@angular/forms';
+import {UserModel} from "../../models/UserModel";
+import {ChatsModel} from "../../models/ChatsModel";
+import {Router} from "@angular/router";
+import {Response} from "../../models/Response";
+import {SendMessageModel} from "../../models/SendMessageModel";
+import {MessageResponse} from "../../models/MessageResponse";
 
 @Component({
   selector: 'app-home',
@@ -20,17 +22,44 @@ export class HomeComponent implements OnInit, OnDestroy {
   usersForSelection: UserModel[] = [];
   chats: ChatsModel[] = [];
   messages: ChatModel[] = [];
-  selectedChatId: any;
-  selectedUser: any;
+  selectedChatId: any; // chatId ---> number
+  selectedUser: any; // userId ---> number
   selectedUserForSelection: UserModel = new UserModel();
   selectedChat: ChatModel = new ChatModel();
-  user = new UserModel();
+  currentUser = new UserModel();
   hub: signalR.HubConnection | undefined;
   message: string = "";
   searchTerm: string = "";
   typingStatus: Map<number, boolean> = new Map<number, boolean>();
   isTyping: boolean = false;
   typingTimeout: any;
+
+  newMessage: SendMessageModel = {
+    chatId: 0,
+    content: '',
+    isContentFile: false,
+    fileCaption: '',
+    file: null,
+    senderId: 0,
+    receiverId: 0,
+    sentDate: '',
+    isSeen: false
+  };
+
+  notification: ChatsModel = {
+    chatId: 0,
+    lastMessage: '',
+    lastMessageDate: '',
+    isSeen: false,
+    senderName: '',
+    senderPhoto: '',
+    senderId: 0,
+    isSeenCount: 0,
+    isShowIsSeen: false,
+    isTyping: false
+  };
+
+  showNotification = false;
 
 
   constructor(private http: HttpClient, private router: Router) {
@@ -51,29 +80,33 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.http.get<Response<UserModel>>("https://localhost:7187/api/v1/user/GetUserById/" + userId)
           .subscribe(res => {
             console.log(res);
-            this.user = res.data;
+            this.currentUser = res.data;
           }, err => {
             console.error(err);
           });
 
-        console.log(this.user);
+        console.log(this.currentUser);
 
       } catch (error) {
         console.error('Error decoding token:', error);
       }
     } else {
       console.error('No access token found');
-      this.user.id = 0;
+      this.currentUser.id = 0;
     }
 
-    this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/messageHub").build();
+    this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/messageHub", {
+      transport: signalR.HttpTransportType.WebSockets,
+    }).build();
 
     console.log(this.hub);
     this.hub.start().then(() => {
+
+
       this.getChatsBelongToUser();
 
 
-      this.hub?.invoke("Connect", parseInt(this.user.id.toString()));
+      this.hub?.invoke("Connect", parseInt(this.currentUser.id.toString()));
 
 
       this.hub?.on("UserLastInfo", (res: UserModel) => {
@@ -82,44 +115,60 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
       });
 
-      this.hub?.on("ReceiveMessage", (res: ChatModel) => {
+      this.hub?.on("ReceiveMessage", (res: MessageResponse) => {
+        console.log(res);
         if (res.senderId === this.selectedUser) {
           this.messages.push(res);
         }
       });
 
-      this.hub?.on("ReceiveUpdatedMessages", (res: any) => {
-        if (res.data) {
+      this.hub?.on("ReceiveUpdatedMessages", (res: MessageResponse) => {
+
+        console.log("ReceiveUpdatedMessages",res);
+
+        if (res) {
           this.messages.forEach(m => {
-            if (m.chatId === res.data.chatId && !m.isSeen) {
+            if (m.chatId === res.chatId && !m.isSeen) {
               m.isSeen = true;
             }
           });
 
           this.chats.forEach(c => {
-            if (c.chatId === res.data.chatId) {
+            if (c.chatId === res.chatId) {
               c.isSeen = true;
             }
           });
-
-
         }
       });
 
       this.hub?.on("FreshChats", (res: ChatsModel[]) => {
+
+
         this.chats = res.sort((a: ChatsModel, b: ChatsModel) => {
           return new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime();
         });
+        console.log("FreshChats",res);
+
       });
 
-      this.hub?.on("ReceiveTyping", (senderId : number, isTyping: boolean) => {
-          this.typingStatus.set(senderId, isTyping);
+      this.hub?.on("ReceiveTyping", (senderId: number, isTyping: boolean) => {
+        this.typingStatus.set(senderId, isTyping);
 
-          this.chats.forEach(c => {
-            if (c.senderId === senderId) {
-              c.isTyping = isTyping;
-            }
-          });
+        this.chats.forEach(c => {
+          if (c.senderId === senderId) {
+            c.isTyping = isTyping;
+          }
+        });
+      });
+
+      this.hub?.on("ReceiveNotification", (res: ChatsModel) => {
+        console.log(res);
+        this.notification = res;
+        this.showNotification = true;
+
+        setTimeout(() => {
+          this.showNotification = false;
+        }, 5000);
       });
 
 
@@ -128,6 +177,10 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
 
+  }
+
+  hideNotification(): void {
+    this.showNotification = false;
   }
 
   onTyping() {
@@ -141,7 +194,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       clearTimeout(this.typingTimeout);
     }
 
-    this.hub?.invoke("IsConnectedUserTyping", this.user.id, this.selectedUserForSelection.id);
+    this.hub?.invoke("IsConnectedUserTyping", this.currentUser.id, this.selectedUserForSelection.id);
 
     // Set a timeout to automatically stop typing after 3 seconds of inactivity
     this.typingTimeout = setTimeout(() => {
@@ -153,24 +206,29 @@ export class HomeComponent implements OnInit, OnDestroy {
   onStopTyping() {
     console.log('Stopped typing');
     clearTimeout(this.typingTimeout);
-    this.typingStatus.set(this.user.id, false);
-    this.hub?.invoke("IsConnectedUserNotTyping", this.user.id, this.selectedUserForSelection.id);
+    this.typingStatus.set(this.currentUser.id, false);
+    this.hub?.invoke("IsConnectedUserNotTyping", this.currentUser.id, this.selectedUserForSelection.id);
   }
 
   ngOnDestroy() {
-    if (this.hub && this.user.id) {
-      this.hub.invoke("UserDisconnectChat", this.user.id).catch(err => console.error(err));
+    if (this.hub && this.currentUser.id) {
+      this.hub.invoke("UserDisconnectChat", this.currentUser.id).catch(err => console.error(err));
     }
   }
 
   getChatsBelongToUser() {
-    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/api/v1/message/GetChatsByUserId/" + this.user.id)
+    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/api/v1/message/GetChatsByUserId/" + this.currentUser.id)
       .subscribe(res => {
+        console.log(res);
 
-        this.chats = res.data.sort((a, b) => {
-          return new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime();
-        });
-        this.selectChat(res.data[0].chatId);
+        if (res.success)
+        {
+          this.chats = res.data.sort((a, b) => {
+            return new Date(b.lastMessageDate).getTime() - new Date(a.lastMessageDate).getTime();
+          });
+        }
+
+       // this.selectChat(res.data[0].chatId);
       }, err => {
         console.error(err);
       });
@@ -200,7 +258,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     // Start new chat
     this.selectedChat = new ChatModel();
-    this.selectedChat.senderId = this.user.id;
+    this.selectedChat.senderId = this.currentUser.id;
     this.selectedChat.receiverId = this.selectedUser;
     this.selectedChat.content = ""; // left blank, user will write the message
     this.selectedChat.chatId = 0;
@@ -210,7 +268,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.messages = [];
     // Start chat
-    this.hub?.invoke("UserConnectChat", this.selectedChatId, this.user.id)
+    this.hub?.invoke("UserConnectChat", this.selectedChatId, this.currentUser.id)
       .then(() => {
         // when chat is started, get the chat id and select the chat
         this.selectChat(this.selectedChatId);
@@ -226,15 +284,19 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (this.selectedChatId === 0) {
       // Start new chat
       this.selectedChat = new ChatModel();
-      this.selectedChat.senderId = this.user.id;
+      this.selectedChat.senderId = this.currentUser.id;
       this.selectedChat.receiverId = this.selectedUser;
       this.selectedChat.content = ""; // left blank, user will write the message
       this.selectedChat.chatId = 0;
       this.selectedChat.sentDate = new Date().toLocaleString();
       this.selectedChat.isSeen = false;
+      this.selectedChat.isContentFile = false;
+      this.selectedChat.fileCaption = "";
 
       // Start Chat
-      this.hub?.invoke("UserConnectChat", this.selectedChatId, this.user.id);
+      this.hub?.invoke("UserConnectChat", this.selectedChatId, this.currentUser.id);
+
+
 
       this.http.get<Response<UserModel>>(
         `https://localhost:7187/api/v1/message/IsUserOnline/${this.selectedUser}`
@@ -249,18 +311,17 @@ export class HomeComponent implements OnInit, OnDestroy {
     } else {
       // Open existing chat
       if (this.selectedChatId) {
-        this.hub?.invoke("UserDisconnectChat", this.user.id);
+        this.hub?.invoke("UserDisconnectChat", this.currentUser.id);
       }
 
-      this.hub?.invoke("UserConnectChat", chatId, this.user.id);
-
+      this.hub?.invoke("UserConnectChat", chatId, this.currentUser.id);
 
 
       this.http.get<Response<ChatModel[]>>("https://localhost:7187/api/v1/message/GetMessagesByChatId/" + chatId)
         .subscribe(res => {
           this.messages = res.data;
 
-          if (res.data[0] && res.data[0].senderId && this.user.id === res.data[0].senderId) {
+          if (res.data[0] && res.data[0].senderId && this.currentUser.id === res.data[0].senderId) {
             this.selectedUser = res.data[0].receiverId;
           } else {
             this.selectedUser = res.data[0].senderId;
@@ -272,19 +333,19 @@ export class HomeComponent implements OnInit, OnDestroy {
           ).subscribe(res => {
             this.selectedUserForSelection = res.data;
             console.log(this.selectedUserForSelection)
-            console.log(this.user);
+            console.log(this.currentUser);
 
 
           }, err => {
             console.error(err);
           });
 
-          this.http.get<Response<UserModel>>(
-            `https://localhost:7187/api/v1/message/UpdateLastMessageSeenStatusByChatId/${this.selectedChatId}?receiverId=${this.user.id}`
+          this.http.get<Response<MessageResponse>>(
+            `https://localhost:7187/api/v1/message/UpdateLastMessageSeenStatusByChatId/${this.selectedChatId}?receiverId=${this.currentUser.id}`
           ).subscribe(
             res => {
               this.messages.forEach(m => {
-                if (m.senderId !== this.user.id && !m.isSeen) {
+                if (m.senderId !== this.currentUser.id && !m.isSeen) {
                   m.isSeen = true;
                 }
               });
@@ -298,41 +359,68 @@ export class HomeComponent implements OnInit, OnDestroy {
         });
 
 
+      this.hub?.invoke("UpdateCurrentMessageSeen", chatId, this.currentUser.id);
+    }
+  }
 
-
-      this.hub?.invoke("UpdateCurrentMessageSeen", chatId, this.user.id);
+  onFileSelected(event: any) {
+    const file = event.target.files[0];
+    console.log(file);
+    if (file) {
+      this.newMessage.file = file;
+      this.newMessage.isContentFile = true;
+      this.message = "";
     }
   }
 
   sendMessage() {
-    if (this.message.trim()) {
-      const newMessage = {
-        chatId: this.selectedChatId,
-        content: this.message,
-        senderId: this.user.id,
-        receiverId: this.selectedUser,
-        sentDate: new Date(),
-        isSeen: false
-      };
+    if (this.message.trim() || this.newMessage.isContentFile) {
+      // Set message details
+      this.newMessage.chatId = this.selectedChatId;
+      this.newMessage.content = this.message;
+      this.newMessage.senderId = this.currentUser.id;
+      this.newMessage.receiverId = this.selectedUser;
+      this.newMessage.sentDate = new Date().toISOString();
+      this.newMessage.isSeen = false;
 
-      this.http.post<Response<ChatModel>>("https://localhost:7187/api/v1/message/SendMessage", newMessage)
-        .subscribe(
-          res => {
-            this.messages.push(res.data);
-            this.message = ""; // Mesaj giriş alanını temizle
-            this.hub?.invoke("NotifyChatUpdates", this.user.id, this.selectedUser);
-            this.selectedChatId = res.data.chatId;
-          },
-          err => {
-            console.error(err);
-          }
-        );
+      const formData = new FormData();
 
-      this.hub?.invoke("IsConnectedUserNotTyping", this.user.id, this.selectedUser);
+      // Append the message details to FormData
+      formData.append('chatId', this.newMessage.chatId.toString());
+      formData.append('content', this.newMessage.content || '');
+      formData.append('senderId', this.newMessage.senderId.toString());
+      formData.append('receiverId', this.newMessage.receiverId.toString());
+      formData.append('sentDate', this.newMessage.sentDate);
+      formData.append('isSeen', this.newMessage.isSeen.toString());
+
+      // If it's a file message, append the file
+      if (this.newMessage.isContentFile && this.newMessage.file) {
+        formData.append('file', this.newMessage.file);
+        formData.append('isContentFile', 'true');
+        formData.append('fileCaption', this.newMessage.fileCaption || '');
+      }
+
+      // Send the formData as the body of the request
+      this.http.post<Response<ChatModel>>("https://localhost:7187/api/v1/message/SendMessage", formData)
+        .subscribe(response => {
+          console.log('Message sent successfully:', response);
+          this.selectedChatId = response.data.chatId;
+          this.messages.push(response.data);
+
+          this.message = '';
+
+          // Clear the file input field
+          this.newMessage.file = null;
+          this.newMessage.isContentFile = false;
+          this.newMessage.fileCaption = '';
+
+        }, error => {
+          console.error('Error sending message:', error);
+        });
+
+      this.hub?.invoke("IsConnectedUserNotTyping", this.currentUser.id, this.selectedUser);
 
     }
-
-
   }
 
   logout() {

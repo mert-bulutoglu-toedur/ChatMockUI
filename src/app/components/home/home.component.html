@@ -1,7 +1,15 @@
 <div class="container">
+
+
+  <div *ngIf="showNotification" class="notification" (click)="selectChat(notification.chatId); hideNotification()">
+    <img src="{{notification.senderPhoto}}" alt="Profile Picture" style="width: 35px; height: 35px; border-radius: 50%;">
+    <p>{{notification.senderName}}: {{notification.lastMessage}}</p>
+  </div>
+
   <div>
     <h1 class="alert alert-dark text-center mt-2">ToEDUR CHAT APP</h1>
-    <h2>{{user.nameSurname}} is Online</h2>
+    <h2>{{currentUser.nameSurname}} is Online</h2>
+    <img src="{{currentUser.userPhoto}}" alt="Profile Picture" style="width: 50px; height: 50px; border-radius: 50%;">
     <button class="btn btn-danger" (click)="logout()" style="float: right;">Exit</button>
   </div>
 
@@ -23,6 +31,7 @@
             <li class="clearfix" *ngFor="let chat of chats" (click)="selectChat(chat.chatId)">
               <div class="about">
                 <div class="name">{{ chat.senderName }}</div>
+                <img src="{{chat.senderPhoto}}" alt="Profile Picture" style="width: 35px; height: 35px; border-radius: 50%;">
                 <div class="name">{{ chat.isTyping ? 'Typing...' : chat.lastMessage }}</div>
                 <div class="name">{{ chat.lastMessageDate | date: 'short' }}</div>
                 <div *ngIf="chat.isSeenCount && chat.isSeenCount > 0">{{ chat.isSeenCount }}</div>
@@ -41,35 +50,46 @@
                 <div class="col-lg-6">
                   <div class="chat-about">
                     <h6 class="m-b-0">{{ selectedUserForSelection.nameSurname }}</h6>
+                    <img src="{{selectedUserForSelection.userPhoto}}" alt="Profile Picture" style="width: 35px; height: 35px; border-radius: 50%;">
                     <h6 class="m-b-0">{{ typingStatus.get(selectedUserForSelection.id) ? (selectedUserForSelection.nameSurname + ' is typing...') : (selectedUserForSelection.isOnline ? "Online" : ("Offline, last seen: " + (selectedUserForSelection.lastActive | date:'short'))) }}</h6>
                   </div>
               </div>
             </div>
 
-            <div class="chat-history">
-              <ul>
-                <li *ngFor="let message of messages">
-                  <div [ngClass]="{'message-left': message.senderId === Number(selectedUserForSelection.id), 'message-right': message.senderId === Number(user.id)}">
-                    <div class="message-content">
-                      <span class="message-sender">{{ message.senderId === Number(selectedUserForSelection.id) ? selectedUserForSelection.nameSurname : (message.senderId === Number(user.id) ? user.nameSurname : '') }}</span>
-                      <span class="message-text">{{ message.content }}</span>
-                      <span class="message-time">{{ message.sentDate | date: 'short' }}</span>
-                      <span *ngIf="message.receiverId !== Number(user.id)" class="message-status">{{ message.isSeen ? "Seen" : "Not Seen" }}</span>
-                    </div>
-                  </div>
-                </li>
-              </ul>
-            </div>
+              <div class="chat-history">
+                <ul>
+                  <li *ngFor="let message of messages">
+                    <div [ngClass]="{'message-left': message.senderId === Number(selectedUserForSelection.id), 'message-right': message.senderId === Number(currentUser.id)}">
+                      <div class="message-content">
+                        <span class="message-sender">{{ message.senderId === Number(selectedUserForSelection.id) ? selectedUserForSelection.nameSurname : (message.senderId === Number(currentUser.id) ? currentUser.nameSurname : '') }}</span>
 
-            <div class="chat-message clearfix">
-              <div class="input-group mb-0">
-                <input [(ngModel)]="message" type="text" class="form-control" placeholder="Enter text here..."
-                       (keydown)="onTyping()" (keydown.enter)="sendMessage()" style="height: 30px;">
-                <div>
-                  <button class="input-group-text" (click)="sendMessage()">Send Message</button>
+                        <!-- If isContentFile is true, display an img tag with message.content as the src -->
+                        <a *ngIf="message.isContentFile" [href]="message.content" target="_blank">
+                          View File
+                        </a>
+                        <span *ngIf="message.fileCaption" class="message-text">{{ message.fileCaption }}</span>
+                        <!-- If isContentFile is false, display the message.content as text -->
+                        <span *ngIf="!message.isContentFile" class="message-text">{{ message.content }}</span>
+
+                        <span class="message-time">{{ message.sentDate | date: 'short' }}</span>
+                        <span *ngIf="message.receiverId !== Number(currentUser.id)" class="message-status">{{ message.isSeen ? "Seen" : "Not Seen" }}</span>
+                      </div>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              <div class="chat-message clearfix">
+                <div class="input-group mb-0">
+                  <input *ngIf="!newMessage.isContentFile" [(ngModel)]="message" type="text" class="form-control" placeholder="Enter text here..."
+                         (keydown)="onTyping()" (keydown.enter)="sendMessage()" style="height: 30px;">
+                  <input type="file" (change)="onFileSelected($event)" accept=".pdf,.doc,.docx,image/*">
+                  <input [(ngModel)]="newMessage.fileCaption" type="text" class="form-control" placeholder="Enter file caption here..." *ngIf="newMessage.isContentFile" style="height: 30px;">
+                  <div>
+                    <button class="input-group-text" (click)="sendMessage()">Send Message</button>
+                  </div>
                 </div>
               </div>
-            </div>
           </div>
         </div>
 
