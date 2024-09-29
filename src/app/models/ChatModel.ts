@@ -1,10 +1,11 @@
 export class ChatModel {
      content?: string;
-     senderId?: number;
-     receiverId?: number;
-     chatId?: number ;
+     senderId?: string;
+     receiverId?: string;
+     chatId?: string ;
      isSeen?: boolean;
      sentDate?: string;
      isContentFile?: boolean;
      fileCaption?: string;
+     filePath?: string;
 }

@@ -30,30 +30,30 @@ export class HomeComponent implements OnInit, OnDestroy {
   hub: signalR.HubConnection | undefined;
   message: string = "";
   searchTerm: string = "";
-  typingStatus: Map<number, boolean> = new Map<number, boolean>();
+  typingStatus: Map<string, boolean> = new Map<string, boolean>();
   isTyping: boolean = false;
   typingTimeout: any;
 
   newMessage: SendMessageModel = {
-    chatId: 0,
+    chatId: '',
     content: '',
     isContentFile: false,
     fileCaption: '',
     file: null,
-    senderId: 0,
+    senderId: '',
     receiverId: 0,
     sentDate: '',
     isSeen: false
   };
 
   notification: ChatsModel = {
-    chatId: 0,
+    chatId: '',
     lastMessage: '',
     lastMessageDate: '',
     isSeen: false,
     senderName: '',
     senderPhoto: '',
-    senderId: 0,
+    senderId: '',
     isSeenCount: 0,
     isShowIsSeen: false,
     isTyping: false
@@ -92,10 +92,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     } else {
       console.error('No access token found');
-      this.currentUser.id = 0;
+      this.currentUser.id = '';
     }
 
-    this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/messageHub", {
+    this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/toedurHub", {
       transport: signalR.HttpTransportType.WebSockets,
     }).build();
 
@@ -106,7 +106,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.getChatsBelongToUser();
 
 
-      this.hub?.invoke("Connect", parseInt(this.currentUser.id.toString()));
+      this.hub?.invoke("Connect", this.currentUser.id);
 
 
       this.hub?.on("UserLastInfo", (res: UserModel) => {
@@ -151,7 +151,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
       });
 
-      this.hub?.on("ReceiveTyping", (senderId: number, isTyping: boolean) => {
+      this.hub?.on("ReceiveTyping", (senderId: string, isTyping: boolean) => {
         this.typingStatus.set(senderId, isTyping);
 
         this.chats.forEach(c => {
@@ -261,7 +261,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.selectedChat.senderId = this.currentUser.id;
     this.selectedChat.receiverId = this.selectedUser;
     this.selectedChat.content = ""; // left blank, user will write the message
-    this.selectedChat.chatId = 0;
+    this.selectedChat.chatId = '';
     this.selectedChat.sentDate = new Date().toLocaleString();
     this.selectedChat.isSeen = false;
 
@@ -287,7 +287,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.selectedChat.senderId = this.currentUser.id;
       this.selectedChat.receiverId = this.selectedUser;
       this.selectedChat.content = ""; // left blank, user will write the message
-      this.selectedChat.chatId = 0;
+      this.selectedChat.chatId = "";
       this.selectedChat.sentDate = new Date().toLocaleString();
       this.selectedChat.isSeen = false;
       this.selectedChat.isContentFile = false;
@@ -386,7 +386,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       const formData = new FormData();
 
       // Append the message details to FormData
-      formData.append('chatId', this.newMessage.chatId.toString());
+      formData.append('chatId', this.newMessage.chatId);
       formData.append('content', this.newMessage.content || '');
       formData.append('senderId', this.newMessage.senderId.toString());
       formData.append('receiverId', this.newMessage.receiverId.toString());

@@ -1,13 +1,13 @@
 
 export interface ChatsModel
 {
-    chatId: number;
+    chatId: string;
     lastMessage: string;
     lastMessageDate: string;
     isSeen: boolean;
     senderName: string;
     senderPhoto: string;
-    senderId: number;
+    senderId: string;
     isSeenCount: number;
     isShowIsSeen: boolean;
     isTyping: boolean;

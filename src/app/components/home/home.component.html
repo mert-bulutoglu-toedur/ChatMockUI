@@ -1,5 +1,5 @@
 <div class="container">
-
+  <a href="http://localhost:4200/departmentlist">GO TO SEE DEPARTMENTS</a>
 
   <div *ngIf="showNotification" class="notification" (click)="selectChat(notification.chatId); hideNotification()">
     <img src="{{notification.senderPhoto}}" alt="Profile Picture" style="width: 35px; height: 35px; border-radius: 50%;">
@@ -59,12 +59,12 @@
               <div class="chat-history">
                 <ul>
                   <li *ngFor="let message of messages">
-                    <div [ngClass]="{'message-left': message.senderId === Number(selectedUserForSelection.id), 'message-right': message.senderId === Number(currentUser.id)}">
+                    <div [ngClass]="{'message-left': message.senderId === selectedUserForSelection.id, 'message-right': message.senderId === currentUser.id}">
                       <div class="message-content">
-                        <span class="message-sender">{{ message.senderId === Number(selectedUserForSelection.id) ? selectedUserForSelection.nameSurname : (message.senderId === Number(currentUser.id) ? currentUser.nameSurname : '') }}</span>
+                        <span class="message-sender">{{ message.senderId === selectedUserForSelection.id ? selectedUserForSelection.nameSurname : (message.senderId === currentUser.id ? currentUser.nameSurname : '') }}</span>
 
                         <!-- If isContentFile is true, display an img tag with message.content as the src -->
-                        <a *ngIf="message.isContentFile" [href]="message.content" target="_blank">
+                        <a *ngIf="message.isContentFile" [href]="message.filePath" target="_blank">
                           View File
                         </a>
                         <span *ngIf="message.fileCaption" class="message-text">{{ message.fileCaption }}</span>
@@ -72,7 +72,7 @@
                         <span *ngIf="!message.isContentFile" class="message-text">{{ message.content }}</span>
 
                         <span class="message-time">{{ message.sentDate | date: 'short' }}</span>
-                        <span *ngIf="message.receiverId !== Number(currentUser.id)" class="message-status">{{ message.isSeen ? "Seen" : "Not Seen" }}</span>
+                        <span *ngIf="message.receiverId !== currentUser.id" class="message-status">{{ message.isSeen ? "Seen" : "Not Seen" }}</span>
                       </div>
                     </div>
                   </li>
@@ -99,4 +99,5 @@
       </div>
     </div>
   </div>
+</div>
 </div>

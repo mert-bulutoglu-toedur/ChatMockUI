@@ -1,5 +1,5 @@
 export class UserModel{
-  id!: number;
+  id!: string;
   nameSurname!: string;
   userPhoto!: string;
   lastActive!: string;
