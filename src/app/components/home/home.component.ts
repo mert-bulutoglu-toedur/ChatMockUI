@@ -341,7 +341,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             this.selectedUserForSelection = res.data;
             console.log(this.selectedUserForSelection)
             console.log(this.currentUser);
-
+            console.log(this.currentUser);
 
           }, err => {
             console.error(err);
