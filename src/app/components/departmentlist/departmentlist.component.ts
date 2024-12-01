@@ -33,12 +33,12 @@ export class DepartmentlistComponent {
 
 
 
-      this.http.get<Response<DepartmentModel[]>>("https://localhost:7187/api/v1/storage/departments").subscribe(data => {
+      this.http.get<Response<DepartmentModel[]>>("https://localhost:7187/v1/storage/departments").subscribe(data => {
         this.departments = data.data;
         console.log(data.data)
       });
 
-      this.http.get<Response<UniversityModel[]>>("https://localhost:7187/api/v1/storage/universities").subscribe(data => {
+      this.http.get<Response<UniversityModel[]>>("https://localhost:7187/v1/storage/universities").subscribe(data => {
         this.universities = data.data;
         console.log(data.data)
       });

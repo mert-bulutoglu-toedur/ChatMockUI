@@ -64,6 +64,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(private http: HttpClient, private router: Router) {
     const token = localStorage.getItem('accessToken');
+    console.log(token);
 
     if (token) {
       try {
@@ -77,7 +78,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         const decodedPayload = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
         const user = JSON.parse(decodedPayload);
         const userId = user['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier'];
-        this.http.get<Response<UserModel>>("https://localhost:7187/api/v1/user/GetUserById/" + userId)
+        console.log(userId);
+        this.http.get<Response<UserModel>>("https://localhost:7187/v1/users/" + userId)
           .subscribe(res => {
             console.log(res);
             this.currentUser = res.data;
@@ -97,7 +99,12 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     this.hub = new signalR.HubConnectionBuilder().withUrl("https://localhost:7187/toedurHub", {
       transport: signalR.HttpTransportType.WebSockets,
-    }).build();
+    })
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Information)
+      .build();
+
+    this.hub.serverTimeoutInMilliseconds = 100000;
 
     console.log(this.hub);
     this.hub.start().then(() => {
@@ -217,7 +224,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   getChatsBelongToUser() {
-    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/api/v1/message/GetChatsByUserId/" + this.currentUser.id)
+    this.http.get<Response<ChatsModel[]>>("https://localhost:7187/v1/message/users/" + this.currentUser.id + "/chats")
       .subscribe(res => {
         console.log(res);
 
@@ -236,7 +243,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   searchUsers() {
     this.http.get<Response<UserModel[]>>(
-      `https://localhost:7187/api/v1/message/GetUserBySearchTerm/${this.searchTerm}`
+      `https://localhost:7187/v1/message/users/search/${this.searchTerm}`
     ).subscribe(res => {
       this.usersForSelection = res.data;
     }, err => {
@@ -299,7 +306,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
       this.http.get<Response<UserModel>>(
-        `https://localhost:7187/api/v1/message/IsUserOnline/${this.selectedUser}`
+        `https://localhost:7187/v1/message/users/${this.selectedUser}/status`
       ).subscribe(res => {
         console.log(res);
         this.selectedUserForSelection = res.data;
@@ -317,7 +324,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       this.hub?.invoke("UserConnectChat", chatId, this.currentUser.id);
 
 
-      this.http.get<Response<ChatModel[]>>("https://localhost:7187/api/v1/message/GetMessagesByChatId/" + chatId)
+      this.http.get<Response<ChatModel[]>>("https://localhost:7187/v1/message/chats/" + chatId + "/messages")
         .subscribe(res => {
           this.messages = res.data;
 
@@ -329,7 +336,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
 
           this.http.get<Response<UserModel>>(
-            `https://localhost:7187/api/v1/message/IsUserOnline/${this.selectedUser}`
+            `https://localhost:7187/v1/message/users/${this.selectedUser}/status`
           ).subscribe(res => {
             this.selectedUserForSelection = res.data;
             console.log(this.selectedUserForSelection)
@@ -340,8 +347,9 @@ export class HomeComponent implements OnInit, OnDestroy {
             console.error(err);
           });
 
-          this.http.get<Response<MessageResponse>>(
-            `https://localhost:7187/api/v1/message/UpdateLastMessageSeenStatusByChatId/${this.selectedChatId}?receiverId=${this.currentUser.id}`
+          this.http.patch<Response<MessageResponse>>(
+            `https://localhost:7187/v1/message/chats/${this.selectedChatId}/seen/${this.currentUser.id}`,
+            {} // Pass an empty body since the backend doesn't require a payload
           ).subscribe(
             res => {
               this.messages.forEach(m => {
@@ -354,8 +362,6 @@ export class HomeComponent implements OnInit, OnDestroy {
               console.error(err);
             }
           );
-        }, err => {
-          console.error(err);
         });
 
 
@@ -401,7 +407,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
 
       // Send the formData as the body of the request
-      this.http.post<Response<ChatModel>>("https://localhost:7187/api/v1/message/SendMessage", formData)
+      this.http.post<Response<ChatModel>>("https://localhost:7187/v1/message", formData)
         .subscribe(response => {
           console.log('Message sent successfully:', response);
           this.selectedChatId = response.data.chatId;

@@ -28,7 +28,7 @@ export class LoginComponent {
     this.userLoginModel.password = password;
 
     console.log(this.userLoginModel);
-    this.http.post<Response<Token>>("https://localhost:7187/api/v1/auth/login", this.userLoginModel)
+    this.http.post<Response<Token>>("https://localhost:7187/v1/auth/login", this.userLoginModel)
       .subscribe({
         next: (res) => {
             console.log(res);
